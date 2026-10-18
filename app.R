@@ -24,6 +24,7 @@ PEATFR <- tryCatch(muat_peatfr(), error = function(e) e)
 ML_TERSEDIA <- !inherits(PEATFR, "error") &&
   exists("autopredictlstm", envir = PEATFR, inherits = FALSE) && tersedia_ml()
 
+teks_tgl <- function(w) if (inherits(w, "Date")) tgl_id(w, singkat = TRUE) else format(w)
 fmt <- function(x, d = 2) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 
 pilihan_model <- if (ML_TERSEDIA) {
@@ -58,6 +59,21 @@ halaman_pemantauan <- function() {
   rentang_ram <- paste(tgl_id(min(ram$waktu), singkat = TRUE, tahun = FALSE), "–", tgl_id(max(ram$waktu), singkat = TRUE))
   n_dekat <- if (!is.null(FIRMS)) sum(FIRMS$jarak_km <= RADIUS_KM & FIRMS$tanggal >= min(ram$waktu) & FIRMS$tanggal <= max(ram$waktu)) else NA
   model <- toupper(a$pengaturan$model %||% "arima")
+  prioritas <- titik_prioritas(FIRMS, min(ram$waktu), max(ram$waktu), RADIUS_KM)
+
+  isi_prioritas <- if (is.null(prioritas)) {
+    p(class = "catatan-kecil", "Tidak ada titik panas selama periode ramalan dalam radius pemantauan.")
+  } else tagList(
+    tags$table(class = "table table-sm align-middle mb-1",
+      tags$thead(tags$tr(tags$th("No"), tags$th("Koordinat"), tags$th("Jarak", style = "text-align:right"),
+                         tags$th("Deteksi", style = "text-align:right"), tags$th("Hari aktif", style = "text-align:right"))),
+      tags$tbody(lapply(seq_len(nrow(prioritas)), function(i) tags$tr(
+        tags$td(span(class = "nomor-tabel", prioritas$no[i])),
+        tags$td(sprintf("%.3f, %.3f", prioritas$lat[i], prioritas$lon[i])),
+        tags$td(paste(angka_id(prioritas$jarak_km[i], 1), "km"), style = "text-align:right"),
+        tags$td(prioritas$deteksi[i], style = "text-align:right"),
+        tags$td(paste0(prioritas$hari[i], " dari ", nrow(ram)), style = "text-align:right"))))),
+    p(class = "catatan-kecil mb-0", "Kelompok titik panas (±3 km) selama periode ramalan, diurutkan dari deteksi terbanyak. Nomor sama dengan penanda di peta."))
 
   tabel_ram <- tags$table(class = "table table-sm align-middle mb-0",
     tags$thead(tags$tr(tags$th("Tanggal"), tags$th("PFVI", style = "text-align:right"), tags$th("Kelas"))),
@@ -90,7 +106,7 @@ halaman_pemantauan <- function() {
     layout_columns(
       col_widths = c(8, 4),
       card(card_header("Peta stasiun dan titik panas"),
-           card_body(peta_ui("peta_sabangau", a, FIRMS, RADIUS_KM, AWAL_RAMALAN),
+           card_body(peta_ui("peta_sabangau", a, FIRMS, RADIUS_KM, AWAL_RAMALAN, prioritas),
                      div(class = "catatan-kecil mt-2",
                          span(style = "color:#1F5F8B;", "●"), " Stasiun   ",
                          span(style = "color:#C0392B;", "●"), " Titik panas selama periode ramalan   ",
@@ -100,6 +116,13 @@ halaman_pemantauan <- function() {
         card(card_header("Ramalan per hari"), card_body(tabel_ram)),
         card(card_header(sprintf("Titik panas per hari (≤ %d km)", RADIUS_KM)), card_body(isi_titik))
       )
+    ),
+    layout_columns(
+      col_widths = c(5, 7),
+      card(card_header(div("Langkah tindak lanjut ", lencana_kelas(akhir))), card_body(
+        tags$ol(class = "langkah", lapply(LANGKAH_KELAS[[akhir]], tags$li)),
+        p(class = "catatan-kecil mb-0", "Contoh langkah per kelas risiko; disesuaikan dengan SOP instansi. Keputusan akhir tetap di tangan petugas."))),
+      card(card_header("Lokasi prioritas verifikasi lapangan"), card_body(isi_prioritas))
     ),
     card(card_body(plotOutput("pantau_plot", height = "400px"))),
     p(class = "catatan-kecil mt-1",
@@ -123,6 +146,11 @@ ui <- page_navbar(
     tags$style(HTML("
       .kepala { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 2px 4px; flex-wrap: wrap; }
       .kepala h4 { font-weight: 700; margin-bottom: 2px; }
+      .nomor-prioritas { background: #1F2933; color: #fff; border: 2px solid #fff; border-radius: 50%;
+        font: 700 12px/18px system-ui, sans-serif; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+      .nomor-tabel { display: inline-block; width: 22px; height: 22px; border-radius: 50%; background: #1F2933;
+        color: #fff; font-weight: 700; font-size: .8rem; text-align: center; line-height: 22px; }
+      .langkah li { margin-bottom: 6px; }
       .lencana { color: #fff; border-radius: 4px; padding: 1px 8px; font-size: .82rem; font-weight: 600; }
       .catatan-kecil { color: #5B6670; font-size: .85rem; }
     "))
@@ -299,7 +327,7 @@ server <- function(input, output, session) {
   output$ringkasan_data <- renderUI({
     d <- data_siap(); q <- kualitas()
     kosong <- sum(is.na(d[names(VARIABEL)]))
-    periode <- if (attr(d, "pakai_tanggal")) paste(format(min(d$waktu), "%d %b %Y"), "s.d.", format(max(d$waktu), "%d %b %Y"))
+    periode <- if (attr(d, "pakai_tanggal")) paste(tgl_id(min(d$waktu), singkat = TRUE), "s.d.", tgl_id(max(d$waktu), singkat = TRUE))
                else "Tanpa kolom tanggal (hari ke-1, 2, ...)"
     layout_columns(
       value_box("Jumlah hari", nrow(d), p(periode)),
@@ -323,7 +351,7 @@ server <- function(input, output, session) {
     t <- t[t$tingkat == "peringatan", ]
     validate(need(nrow(t) > 0, "Tidak ada titik yang mencurigakan."))
     d <- data_siap()
-    data.frame(Waktu = format(d$waktu[t$baris]), Variabel = unname(VARIABEL[t$variabel]),
+    data.frame(Waktu = teks_tgl(d$waktu[t$baris]), Variabel = unname(VARIABEL[t$variabel]),
                Nilai = fmt(t$nilai), Alasan = t$alasan)
   })
 
@@ -389,7 +417,7 @@ server <- function(input, output, session) {
 
   output$tabel_ramalan <- renderTable({
     h <- perlu_hasil()$hasil; ram <- h[h$status == "Ramalan", ]
-    tabel <- data.frame(format(ram$waktu), fmt(ram$WT, 3), fmt(ram$SM, 1), fmt(ram$Rf, 3),
+    tabel <- data.frame(teks_tgl(ram$waktu), fmt(ram$WT, 3), fmt(ram$SM, 1), fmt(ram$Rf, 3),
                         fmt(ram$Temp, 1), fmt(ram$PFVI, 1), ram$kelas)
     names(tabel) <- c("Waktu", "Muka air (m)", "Kelembapan (%)", "Hujan (mm)",
                       "Suhu (°C)", "PFVI", "Kelas")

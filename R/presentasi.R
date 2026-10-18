@@ -106,7 +106,7 @@ tabel_html <- function(df, kanan = character(0)) {
 }
 
 #' Peta Leaflet (JavaScript) dengan stasiun dan titik panas.
-peta_ui <- function(id, hasil, titik, radius = 25, awal_ramalan = NULL) {
+peta_ui <- function(id, hasil, titik, radius = 25, awal_ramalan = NULL, prioritas = NULL) {
   obs <- hasil$hasil[hasil$hasil$status == "Observasi", ]
   ram <- hasil$hasil[hasil$hasil$status == "Ramalan", ]
   popup_stasiun <- sprintf(
@@ -120,6 +120,8 @@ peta_ui <- function(id, hasil, titik, radius = 25, awal_ramalan = NULL) {
       titik$lat, titik$lon, tgl_id(titik$tanggal, singkat = TRUE), titik$sensor,
       ifelse(dalam, "true", "false"), titik$jarak_km), collapse = ","), "]")
   }
+  pri <- if (is.null(prioritas) || !nrow(prioritas)) "[]" else
+    paste0("[", paste(sprintf('{"lat":%.5f,"lon":%.5f,"no":%d}', prioritas$lat, prioritas$lon, prioritas$no), collapse = ","), "]")
   js <- sprintf("
 (function(){
   var peta = null;
@@ -141,6 +143,10 @@ peta_ui <- function(id, hasil, titik, radius = 25, awal_ramalan = NULL) {
        .bindPopup('<b>Titik panas ' + p.s + '</b><br>' + p.t + '<br>' + p.jarak.toFixed(1) + ' km dari stasiun')
        .addTo(peta);
     });
+    %s.forEach(function(q){
+      L.marker([q.lat, q.lon], {icon: L.divIcon({className: 'nomor-prioritas', html: String(q.no), iconSize: [22, 22]}),
+        zIndexOffset: 1000}).bindTooltip('Lokasi prioritas ' + q.no).addTo(peta);
+    });
     L.circleMarker([%f, %f], {radius: 10, color: '#ffffff', weight: 3, fillColor: '#1F5F8B', fillOpacity: 1})
       .bindPopup(%s, {minWidth: 260, maxWidth: 320})
       .bindTooltip('Stasiun (klik untuk detail)', {permanent: true, direction: 'left', offset: [-10, 0]}).addTo(peta);
@@ -149,7 +155,7 @@ peta_ui <- function(id, hasil, titik, radius = 25, awal_ramalan = NULL) {
   document.addEventListener('shown.bs.tab', segarkan);
   if (document.readyState !== 'loading') setTimeout(segarkan, 300); else document.addEventListener('DOMContentLoaded', function(){ setTimeout(segarkan, 300); });
 })();",
-    id, STASIUN$lat, STASIUN$lon, STASIUN$lat, STASIUN$lon, radius, radius, pts,
+    id, STASIUN$lat, STASIUN$lon, STASIUN$lat, STASIUN$lon, radius, radius, pts, pri,
     STASIUN$lat, STASIUN$lon, jsonlite_kutip(popup_stasiun))
   tagList(div(id = id, style = "height: 600px; border-radius: 8px;"), tags$script(HTML(js)))
 }
@@ -159,3 +165,32 @@ jsonlite_kutip <- function(x) {
   x <- gsub("\\\\", "\\\\\\\\", x); x <- gsub("'", "\\\\'", x); x <- gsub("\n", " ", x)
   paste0("'", x, "'")
 }
+
+#' Lokasi prioritas verifikasi: titik panas selama periode ramalan dalam radius,
+#' dikelompokkan per sel ±3 km supaya deteksi MODIS dan VIIRS atas api yang sama digabung.
+titik_prioritas <- function(titik, awal, akhir, radius = 25, n = 6) {
+  if (is.null(titik) || !nrow(titik)) return(NULL)
+  d <- titik[titik$jarak_km <= radius & titik$tanggal >= awal & titik$tanggal <= akhir, ]
+  if (!nrow(d)) return(NULL)
+  sel <- paste(round(d$lat / 0.03), round(d$lon / 0.03))  # sel ±3 km
+  g <- do.call(rbind, lapply(split(d, sel), function(x) data.frame(
+    lat = mean(x$lat), lon = mean(x$lon), deteksi = nrow(x), hari = length(unique(x$tanggal)),
+    terakhir = max(x$tanggal), jarak_km = min(x$jarak_km))))
+  g <- g[order(-g$deteksi, -g$hari, g$jarak_km), ]
+  g <- head(g, n); g$no <- seq_len(nrow(g)); rownames(g) <- NULL
+  g
+}
+
+#' Contoh langkah tindak lanjut per kelas risiko (disesuaikan dengan SOP instansi).
+LANGKAH_KELAS <- list(
+  Rendah = c("Pemantauan rutin data stasiun", "Pastikan sensor dan pengiriman data berfungsi"),
+  Sedang = c("Tinjau tren mingguan bersama tim terkait", "Periksa kondisi sekat kanal dan muka air",
+             "Siapkan rencana patroli bila tren terus naik"),
+  Tinggi = c("Review hasil bersama tim terkait", "Patroli terjadwal di sekitar stasiun",
+             "Periksa sekat kanal; lakukan pembasahan ulang bila muka air lebih dari 40 cm",
+             "Siagakan regu pemadam setempat"),
+  Ekstrem = c("Review hasil bersama tim terkait hari ini", "Verifikasi lapangan di lokasi prioritas (tabel di samping)",
+              "Patroli harian dan kesiagaan regu pemadam dalam radius pemantauan",
+              "Pembasahan ulang dan pemeriksaan sekat kanal di area terdekat",
+              "Catat hasil verifikasi dan keputusan sebagai umpan balik model")
+)

@@ -183,7 +183,7 @@ peatfr-app/
 ├── peatfr-riset/      Salinan kode riset Peatfr untuk server (tanpa LSTM/GRU), lihat SUMBER.md
 ├── presentasi/        Skrip dan hasil Sabangau yang sudah dihitung
 ├── data/
-│   ├── Dataset_Sabangau.csv     Dataset paper (tautan resmi di bagian Data availability paper)
+│   ├── Dataset_Sabangau.csv     Dataset paper (tautan resmi di bagian Data availability paper), ditambah kolom Tanggal (hari ke-1 = 1 April 2023)
 │   └── firms/                   CSV titik panas NASA FIRMS
 ├── www/               Pustaka peta Leaflet 1.9.4 (lisensi BSD-2, lihat www/leaflet/LICENSE)
 └── contoh/
