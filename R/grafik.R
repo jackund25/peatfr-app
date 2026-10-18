@@ -47,7 +47,7 @@ grafik_pfvi <- function(hasil) {
                      kelas = factor(KELAS_NAMA, levels = KELAS_NAMA))
   batas_ramal <- obs$waktu[nrow(obs)]
 
-  ggplot() +
+  g <- ggplot() +
     geom_rect(data = pita, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax, fill = kelas),
               alpha = 0.13) +
     scale_fill_manual(values = WARNA_KELAS, name = "Kelas PFVI") +
@@ -60,4 +60,11 @@ grafik_pfvi <- function(hasil) {
          subtitle = "Garis biru: hasil hitung dari data observasi. Titik merah: ramalan. Garis putus-putus: akhir data observasi.") +
     tema_app() +
     guides(fill = guide_legend(override.aes = list(alpha = 0.4)))
+  # Label bulan berbahasa Indonesia kalau sumbu berupa tanggal
+  if (inherits(hasil$waktu, "Date")) {
+    g <- g + scale_x_date(
+      breaks = seq(as.Date(format(min(hasil$waktu), "%Y-%m-01")), max(hasil$waktu), by = "1 month"),
+      labels = function(x) paste(BULAN_ID_SINGKAT[as.integer(format(x, "%m"))], format(x, "%Y")))
+  }
+  g
 }

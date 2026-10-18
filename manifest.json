@@ -1990,19 +1990,19 @@
   },
   "files": {
     "R/grafik.R": {
-      "checksum": "6e9e4ce6a0da514e9ad071def9d206af"
+      "checksum": "4ef8e61fd28bd971356b06e8818fd545"
     },
     "R/pipeline.R": {
       "checksum": "91ab433bfa661e937cc3828993d08ae6"
     },
     "R/presentasi.R": {
-      "checksum": "e22389a85b0f8575e073540144a8a103"
+      "checksum": "3b41f717b904c0b7291ca54ce401bf32"
     },
     "README.md": {
-      "checksum": "2c2cae63d33c57be8c45fa469d83e967"
+      "checksum": "f90af7e8366f458b017c260927236496"
     },
     "app.R": {
-      "checksum": "23c443179f7faeb6fac496164e8a7efd"
+      "checksum": "b10a3f8ab772f0abaa87a8095e0c9875"
     },
     "contoh/contoh_data_gambut.csv": {
       "checksum": "e1a020ddfde7620fed0df34befa2924f"
@@ -2054,9 +2054,6 @@
     },
     "presentasi/hitung_sabangau.R": {
       "checksum": "d0668333762d8c885d5908fa5c3097ff"
-    },
-    "www/ilustrasi_peatfr.svg": {
-      "checksum": "df0dd236fe87b9481a6eeedb79c854b7"
     },
     "www/leaflet/LICENSE": {
       "checksum": "609e72f97803246ff294511b99c8c89a"

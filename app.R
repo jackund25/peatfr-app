@@ -12,7 +12,7 @@ source("R/pipeline.R")
 source("R/grafik.R")
 source("R/presentasi.R")
 
-# Hasil Sabangau yang sudah dihitung (presentasi/hitung_sabangau.R) dan titik panas FIRMS
+# Hasil stasiun Sabangau yang sudah dihitung (presentasi/hitung_sabangau.R) dan titik panas FIRMS
 PRESENTASI <- muat_presentasi()
 FIRMS <- muat_firms()
 AWAL_RAMALAN <- if (!is.null(PRESENTASI)) min(PRESENTASI$asli$hasil$waktu[PRESENTASI$asli$hasil$status == "Ramalan"]) else NULL
@@ -44,139 +44,67 @@ belum_dihitung <- function() div(class = "alert alert-warning mt-4",
   "Hasil Sabangau belum dihitung. Jalankan: Rscript presentasi/hitung_sabangau.R")
 
 # -----------------------------------------------------------------------------
-# Halaman presentasi
+# Halaman pemantauan (hasil tersimpan untuk stasiun Sabangau)
 # -----------------------------------------------------------------------------
-halaman_ringkasan <- function() {
+lencana_kelas <- function(k) span(class = "lencana", style = sprintf("background:%s;", WARNA_KELAS[[k]]), k)
+
+halaman_pemantauan <- function() {
   if (is.null(PRESENTASI)) return(belum_dihitung())
-  a <- PRESENTASI$asli; b <- PRESENTASI$bersih
+  a <- PRESENTASI$asli
   obs <- a$hasil[a$hasil$status == "Observasi", ]; ram <- a$hasil[a$hasil$status == "Ramalan", ]
   mulai_ekstrem <- obs$waktu[nrow(obs) - a$ekstrem_beruntun + 1]
-  geser <- abs(tail(a$hasil$PFVI, 1) - tail(b$hasil$PFVI, 1))
+  akhir <- ram$kelas[nrow(ram)]
+  tema <- c(Rendah = "success", Sedang = "warning", Tinggi = "warning", Ekstrem = "danger")[[akhir]]
+  rentang_ram <- paste(tgl_id(min(ram$waktu), singkat = TRUE, tahun = FALSE), "–", tgl_id(max(ram$waktu), singkat = TRUE))
   n_dekat <- if (!is.null(FIRMS)) sum(FIRMS$jarak_km <= RADIUS_KM & FIRMS$tanggal >= min(ram$waktu) & FIRMS$tanggal <= max(ram$waktu)) else NA
+  model <- toupper(a$pengaturan$model %||% "arima")
 
-  kotak_titik <- if (!is.na(n_dekat)) {
-    value_box(sprintf("Titik panas satelit ≤ %d km, %s", RADIUS_KM, paste(format(range(ram$waktu), "%d"), collapse = "–")),
-              n_dekat, p("Oktober 2023, data NASA FIRMS"), theme = if (n_dekat > 0) "danger" else NULL)
-  } else {
-    value_box("Hari hujan di atas 5,1 mm", a$hari_hujan_aktif, p("faktor hujan tidak pernah aktif"), theme = "warning")
-  }
+  tabel_ram <- tags$table(class = "table table-sm align-middle mb-0",
+    tags$thead(tags$tr(tags$th("Tanggal"), tags$th("PFVI", style = "text-align:right"), tags$th("Kelas"))),
+    tags$tbody(lapply(seq_len(nrow(ram)), function(i) tags$tr(
+      tags$td(tgl_id(ram$waktu[i], singkat = TRUE)),
+      tags$td(angka_id(ram$PFVI[i], 1), style = "text-align:right"),
+      tags$td(lencana_kelas(ram$kelas[i]))))))
 
-  butir_ringkasan <- ringkasan_temuan(a, PRESENTASI$kualitas)
-  if (!is.na(n_dekat) && n_dekat > 0) {
-    n <- length(butir_ringkasan)
-    butir_ringkasan[[n]]$isi <- sprintf(paste(
-      "Satelit NASA mencatat %d titik panas dalam radius %d km pada %s, sejalan dengan kelas Ekstrem.",
-      "Namun titik panas sudah terdeteksi sejak %s (awal data satelit yang diunduh), sebelum periode ramalan, jadi ini belum membuktikan kemampuan memberi peringatan lebih awal.",
-      "Perlu pengujian di banyak lokasi dan musim, termasuk tingkat alarm palsu. Hasil mewakili satu titik pengukuran dan bukan pengganti verifikasi lapangan."),
-      n_dekat, RADIUS_KM, paste(tgl_id(min(ram$waktu), tahun = FALSE), "s.d.", tgl_id(max(ram$waktu))),
-      tgl_id(min(FIRMS$tanggal[FIRMS$jarak_km <= RADIUS_KM])))
-  }
+  ringkas_titik <- if (!is.null(FIRMS)) tabel_titik_panas(FIRMS, RADIUS_KM) else NULL
+  isi_titik <- if (is.null(FIRMS)) {
+    p(class = "catatan-kecil", "Data titik panas belum dimuat (folder data/firms).")
+  } else if (is.null(ringkas_titik)) {
+    p(class = "catatan-kecil", sprintf("Tidak ada titik panas dalam radius %d km.", RADIUS_KM))
+  } else tabel_html(ringkas_titik, kanan = setdiff(names(ringkas_titik), "Tanggal"))
 
   tagList(
-    div(class = "hero",
-        h1("Memprediksi risiko kebakaran gambut sebelum api muncul"),
-        p("Studi kasus Sabangau, Kalimantan Tengah · data harian 1 April s.d. 9 Oktober 2023 · model Peatfr (ITB, IPB, University of Nottingham)")),
+    div(class = "kepala",
+        div(h4("Stasiun BRGM Sabangau"),
+            span(class = "text-muted", "Kalimantan Tengah · observasi s.d. ", tgl_id(max(obs$waktu)),
+                 " · ramalan ", nrow(ram), " hari · model ", model)),
+        span(class = "badge text-bg-light border", "Contoh data: Sabangau 2023")),
     layout_columns(
-      value_box(paste("Kelas ramalan", paste(format(range(ram$waktu), "%d"), collapse = "–"), "Okt 2023"),
-                ram$kelas[nrow(ram)], p(paste("PFVI", angka_id(min(ram$PFVI), 1), "s.d.", angka_id(max(ram$PFVI), 1))), theme = "danger"),
+      value_box("Kelas ramalan", akhir, p(rentang_ram, " · PFVI ", angka_id(max(ram$PFVI), 1)), theme = tema),
       value_box("Muka air tanah terakhir", paste(angka_id(-obs$WT[nrow(obs)] * 100), "cm"),
-                p("di bawah permukaan; ambang bahaya 40 cm")),
-      value_box("Kelas Ekstrem berturut-turut", paste(a$ekstrem_beruntun, "hari"),
-                p(paste("sejak", tgl_id(mulai_ekstrem)))),
-      kotak_titik
+                p("di bawah permukaan · ambang 40 cm")),
+      value_box("Ekstrem berturut-turut", paste(a$ekstrem_beruntun, "hari"), p("sejak ", tgl_id(mulai_ekstrem))),
+      value_box(sprintf("Titik panas ≤ %d km", RADIUS_KM), if (is.na(n_dekat)) "–" else n_dekat,
+                p("selama periode ramalan · NASA FIRMS"), theme = if (!is.na(n_dekat) && n_dekat > 0) "danger" else NULL)
     ),
-    layout_columns(
-      col_widths = c(6, 6),
-      card(card_header("Tiga pesan utama"), card_body(
-        div(class = "pesan", tags$b("1. Ilmunya kuat dan terbuka"),
-            "Hasil paper berhasil kami reproduksi dengan dataset resmi penulis. Kodenya terbuka, sehingga bisa diaudit dan dikembangkan.",
-            if (!is.na(n_dekat) && n_dekat > 0) sprintf(
-              " Pada hari-hari yang diramal Ekstrem, satelit NASA mencatat %d titik panas dalam radius %d km dari stasiun.",
-              n_dekat, RADIUS_KM)),
-        div(class = "pesan", style = "border-color:#E3B23C;", tags$b("2. Tantangan utamanya data, bukan rumus"),
-            sprintf("Beberapa hari data sensor yang diduga rusak menggeser indeks sekitar %s poin. Hujan tidak pernah cukup besar untuk dihitung. Validasi baru satu stasiun dan satu musim kemarau.", angka_id(geser))),
-        div(class = "pesan", style = "border-color:#4E9A5B;", tags$b("3. Datanya sudah ada, tapi belum terhubung"),
-            "Muka air dan kelembapan tanah (BPGMN, eks-BRGM), muka air di areal konsesi (KLH), cuaca (BMKG), titik panas (Kemenhut, BRIN, NASA). Integrasi data dan operasionalisasi adalah langkah berikutnya.")
-      )),
-      card(card_header("Ringkasan otomatis dari hasil model"), card_body(tampil_butir(butir_ringkasan)))
-    ),
-    card(card_header("Indeks kerawanan harian dan ramalan 4 hari ke depan"),
-         card_body(plotOutput("pres_plot", height = "440px"),
-                   tableOutput("pres_tabel_skenario"),
-                   p(class = "catatan-kecil",
-                     "Garis abu-abu putus-putus menunjukkan hasil bila data kelembapan yang diduga gangguan sensor (3 s.d. 8 Oktober 2023) dikeluarkan lalu diisi ulang."))),
-    card(card_header("Bagaimana model bekerja"),
-         card_body(tags$img(src = "ilustrasi_peatfr.svg", class = "ilustrasi",
-                            alt = "Penampang gambut dan alur kerja Peatfr"))),
-    p(class = "catatan-kecil mt-2",
-      "Sumber: Mahdiyasa dkk. (2025), Ecological Informatics 92, 103532; kode github.com/mellygsln/peatfr; dataset Sabangau dari tautan resmi di paper. Prototipe VeloCT, bukan sistem operasional.")
-  )
-}
-
-halaman_peta <- function() {
-  if (is.null(PRESENTASI)) return(belum_dihitung())
-  ringkas <- if (!is.null(FIRMS)) tabel_titik_panas(FIRMS, RADIUS_KM) else NULL
-  panel_kanan <- if (is.null(FIRMS)) {
-    p(class = "catatan-kecil", "Data titik panas NASA FIRMS belum dimuat. Simpan CSV unduhan FIRMS di folder data/firms lalu muat ulang aplikasi.")
-  } else if (is.null(ringkas)) {
-    p(sprintf("Tidak ada titik panas dalam radius %d km dari stasiun pada periode data.", RADIUS_KM))
-  } else {
-    tagList(tabel_html(ringkas, kanan = setdiff(names(ringkas), "Tanggal")),
-            p(class = "catatan-kecil", "Jumlah titik panas per hari dalam radius ", RADIUS_KM, " km dari stasiun, menurut sensor satelit."))
-  }
-  tagList(
-    div(class = "hero",
-        h1("Apa yang terlihat dari satelit"),
-        p("Model meramal kelas Ekstrem untuk 10 s.d. 13 Oktober 2023. Titik merah: titik panas yang terdeteksi satelit pada hari-hari tersebut; titik kuning: hari-hari sebelumnya.")),
     layout_columns(
       col_widths = c(8, 4),
-      card(card_body(peta_ui("peta_sabangau", PRESENTASI$asli, FIRMS, RADIUS_KM, AWAL_RAMALAN))),
-      card(card_header("Titik panas di sekitar stasiun"), card_body(
-        panel_kanan,
-        hr(),
-        div(class = "catatan-kecil",
-            tags$b("Cara membaca"), br(),
-            span(style = "color:#1F5F8B;", "●"), " Stasiun pemantauan (perkiraan lokasi dari paper)", br(),
-            span(style = "color:#C0392B;", "●"), " Titik panas pada hari yang diramal Ekstrem", br(),
-            span(style = "color:#E3B23C;", "●"), " Titik panas pada hari sebelumnya", br(),
-            "Lingkaran putus-putus: radius ", RADIUS_KM, " km", br(), br(),
-            "Titik panas adalah anomali suhu yang terdeteksi satelit, belum tentu semuanya kebakaran; tetap perlu verifikasi lapangan.")
-      ))
-    )
-  )
-}
-
-halaman_kl <- function() {
-  baris <- data.frame(
-    Data = c("Tinggi muka air tanah (stasiun restorasi)", "Tinggi muka air tanah (areal konsesi)", "Kelembapan tanah",
-             "Curah hujan", "Suhu udara", "Indeks bahaya cuaca", "Titik panas", "Peta Kesatuan Hidrologis Gambut",
-             "Izin konsesi dan tutupan lahan", "Batas desa dan kependudukan"),
-    `Fungsi di model` = c("Input utama", "Memperapat jaringan pemantauan", "Input dan acuan kalibrasi", "Input", "Input",
-                          "Pembanding", "Validasi model", "Unit wilayah peta risiko", "Konteks dan penanggung jawab lahan",
-                          "Sasaran peringatan dini"),
-    `Pemegang data` = c("BPGMN (warisan SIPALAGA BRGM)", "KLH", "BPGMN (SIPALAGA)", "BPGMN, BMKG", "BMKG", "BMKG (SPARTAN)",
-                        "Kemenhut (SiPongi), BRIN, NASA FIRMS", "KLH", "Kemenhut, Kementan, ATR/BPN", "BIG, Kemendagri, BPS"),
-    Catatan = c("Sumber data di paper Peatfr; sensor lapangan, bukan satelit", "Hampir 11.000 alat pantau di areal 332 perusahaan (Nov 2024)",
-                "Data Sabangau berisi beberapa hari yang diduga gangguan sensor", "Satuan perlu diseragamkan antarinstansi",
-                "Sumber data di paper Peatfr", "Hanya berbasis cuaca, tanpa muka air tanah", "Paper memvalidasi dengan FIRMS",
-                "Sekitar 500 KHG akan dipetakan BPGMN", "Dibutuhkan untuk memasukkan faktor aktivitas manusia",
-                "Untuk menurunkan peringatan sampai tingkat desa"),
-    check.names = FALSE)
-  tagList(
-    div(class = "hero",
-        h1("Datanya sudah ada, tersebar di banyak instansi"),
-        p("Semua input model sudah dimiliki pemerintah. Tantangannya adalah menghubungkan, menyeragamkan, dan menjaga kualitasnya.")),
-    card(card_body(tabel_html(baris))),
-    layout_columns(
-      col_widths = c(4, 4, 4),
-      card(card_header("1. Inventarisasi data"), card_body(
-        "Memetakan data per instansi: apa, di mana, seberapa sering, formatnya, kualitasnya, dan hak aksesnya. Langkah pertama yang berisiko rendah dan langsung berguna.")),
-      card(card_header("2. Standar dan pertukaran data"), card_body(
-        "Kamus data dan satuan yang seragam, pemeriksaan kualitas otomatis, serta perjanjian pertukaran data, di bawah payung Satu Data Indonesia.")),
-      card(card_header("3. Platform dan dashboard"), card_body(
-        "Menjalankan model secara terjadwal, peringkat risiko antarlokasi, validasi rutin dengan titik panas, dan pelatihan untuk daerah."))
+      card(card_header("Peta stasiun dan titik panas"),
+           card_body(peta_ui("peta_sabangau", a, FIRMS, RADIUS_KM, AWAL_RAMALAN),
+                     div(class = "catatan-kecil mt-2",
+                         span(style = "color:#1F5F8B;", "●"), " Stasiun   ",
+                         span(style = "color:#C0392B;", "●"), " Titik panas selama periode ramalan   ",
+                         span(style = "color:#E3B23C;", "●"), " Titik panas sebelumnya   ",
+                         "- - - radius ", RADIUS_KM, " km"))),
+      div(
+        card(card_header("Ramalan per hari"), card_body(tabel_ram)),
+        card(card_header(sprintf("Titik panas per hari (≤ %d km)", RADIUS_KM)), card_body(isi_titik))
+      )
     ),
-    p(class = "catatan-kecil mt-2", "Usulan peran VeloCT sebagai mitra teknologi, melengkapi tim peneliti. Sumber: Antara (19 Nov 2024), BMKG (Jun 2026), Kemenhut via Sindonews (Agu 2026), Setneg (Okt 2026).")
+    card(card_body(plotOutput("pantau_plot", height = "400px"))),
+    p(class = "catatan-kecil mt-1",
+      "Sumber data: dataset Sabangau (Mahdiyasa dkk., 2025); titik panas NASA FIRMS (MODIS, VIIRS). ",
+      "Lokasi stasiun perkiraan. Titik panas adalah anomali suhu dari satelit dan perlu verifikasi lapangan.")
   )
 }
 
@@ -193,25 +121,17 @@ ui <- page_navbar(
     tags$link(rel = "stylesheet", href = "leaflet/leaflet.css"),
     tags$script(src = "leaflet/leaflet.js"),
     tags$style(HTML("
-      .hero { padding: 28px 4px 8px; }
-      .hero h1 { font-size: 1.9rem; font-weight: 700; margin-bottom: .4rem; }
-      .hero p { color: #5B6670; font-size: 1.05rem; margin-bottom: 0; }
-      .pesan { border-left: 4px solid #1F5F8B; padding: 6px 0 6px 14px; margin-bottom: 14px; }
-      .pesan b { display: block; font-size: 1.02rem; }
-      .ilustrasi { width: 100%; max-width: 980px; display: block; margin: 0 auto; }
+      .kepala { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 18px 2px 4px; flex-wrap: wrap; }
+      .kepala h4 { font-weight: 700; margin-bottom: 2px; }
+      .lencana { color: #fff; border-radius: 4px; padding: 1px 8px; font-size: .82rem; font-weight: 600; }
       .catatan-kecil { color: #5B6670; font-size: .85rem; }
     "))
   ),
 
-  nav_panel("Ringkasan", halaman_ringkasan()),
-  nav_panel("Peta", halaman_peta()),
-  nav_panel("Data lintas K/L", halaman_kl()),
-
-  nav_menu(
-  "Coba sendiri",
+  nav_panel("Pemantauan", halaman_pemantauan()),
 
   nav_panel(
-    "1. Data",
+    "Data",
     layout_sidebar(
       sidebar = sidebar(
         width = 320,
@@ -238,7 +158,7 @@ ui <- page_navbar(
   ),
 
   nav_panel(
-    "2. Jalankan model",
+    "Jalankan model",
     layout_columns(
       col_widths = c(5, 7),
       card(
@@ -277,9 +197,9 @@ ui <- page_navbar(
   ),
 
   nav_panel(
-    "3. Hasil",
+    "Hasil",
     uiOutput("kotak_hasil"),
-    card(card_header("Ringkasan untuk pengambil keputusan"), card_body(uiOutput("ringkasan"))),
+    card(card_header("Interpretasi otomatis"), card_body(uiOutput("ringkasan"))),
     card(card_body(plotOutput("plot_pfvi", height = "440px"))),
     layout_columns(
       col_widths = c(7, 5),
@@ -289,7 +209,7 @@ ui <- page_navbar(
   ),
 
   nav_panel(
-    "4. Evaluasi model",
+    "Evaluasi model",
     card(
       card_header("Akurasi peramalan dibanding tebakan naif"),
       card_body(
@@ -310,7 +230,7 @@ ui <- page_navbar(
   ),
 
   nav_panel(
-    "5. Unduh",
+    "Unduh",
     card(
       card_header("Unduh hasil"),
       p("Hasil lengkap per hari: data yang sudah diisi, status observasi atau ramalan, PFVI, dan kelasnya."),
@@ -319,8 +239,6 @@ ui <- page_navbar(
       downloadButton("unduh_evaluasi", "Evaluasi model (CSV)"),
       downloadButton("unduh_temuan", "Temuan kualitas data (CSV)")
     )
-  ),
-
   ),
 
   nav_spacer(),
@@ -436,10 +354,10 @@ server <- function(input, output, session) {
     })
   })
 
-  observeEvent(hasil(), if (!is.null(hasil())) nav_select("main", "3. Hasil", session = session))
+  observeEvent(hasil(), if (!is.null(hasil())) nav_select("main", "Hasil", session = session))
 
   perlu_hasil <- function() {
-    validate(need(hasil(), "Belum ada hasil. Jalankan model di tab 2."))
+    validate(need(hasil(), "Belum ada hasil. Jalankan model di tab Jalankan model."))
     hasil()
   }
 
@@ -461,15 +379,11 @@ server <- function(input, output, session) {
 
   output$ringkasan <- renderUI(tampil_butir(ringkasan_temuan(perlu_hasil(), kualitas())))
 
-  # Halaman presentasi ------------------------------------------------------
-  output$pres_plot <- renderPlot({
+  # Halaman pemantauan -----------------------------------------------------
+  output$pantau_plot <- renderPlot({
     req(PRESENTASI)
-    grafik_pfvi_banding(PRESENTASI$asli, PRESENTASI$bersih)
+    grafik_pfvi(PRESENTASI$asli$hasil)
   }, res = 96)
-  output$pres_tabel_skenario <- renderTable({
-    req(PRESENTASI)
-    tabel_skenario(PRESENTASI$asli, PRESENTASI$bersih)
-  })
 
   output$plot_pfvi <- renderPlot(grafik_pfvi(perlu_hasil()$hasil), res = 96)
 

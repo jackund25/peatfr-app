@@ -13,23 +13,14 @@ Status: **prototipe** untuk eksplorasi internal VeloCT.
 
 ## Alur aplikasi
 
-**Halaman presentasi** (langsung tampil, tanpa menjalankan model):
-
-| Halaman | Isi |
-| --- | --- |
-| Ringkasan | Hasil Sabangau yang sudah dihitung: kelas risiko, tiga pesan utama, ringkasan otomatis, grafik dua skenario (data asli dan tanpa data sensor yang diduga rusak), ilustrasi cara kerja |
-| Peta | Lokasi stasiun Sabangau dan titik panas satelit NASA FIRMS di sekitarnya |
-| Data lintas K/L | Pemetaan pemegang data input model dan usulan peran VeloCT |
-
-**Menu "Coba sendiri"** untuk menjalankan model dengan data apa pun:
-
 | Tab | Isi |
 | --- | --- |
-| 1. Data | Unggah CSV, pemetaan kolom otomatis, grafik empat variabel, pemeriksaan kualitas data |
-| 2. Jalankan model | Pilih metode imputasi, model peramalan, jumlah hari ramalan, dan R0 |
-| 3. Hasil | Kelas risiko, grafik PFVI dengan pita kelas, tabel ramalan, jumlah hari per kelas |
-| 4. Evaluasi model | Akurasi peramalan dibanding tebakan naif, uji Ljung-Box, parameter PFVI hasil kalibrasi |
-| 5. Unduh | Hasil per hari, evaluasi model, dan temuan kualitas data dalam CSV |
+| Pemantauan | Tampilan stasiun: kelas ramalan, muka air tanah terakhir, lama kondisi Ekstrem, peta stasiun dan titik panas satelit NASA FIRMS, ramalan per hari, dan grafik PFVI. Saat ini berisi contoh stasiun Sabangau yang sudah dihitung |
+| Data | Unggah CSV, pemetaan kolom otomatis, grafik empat variabel, pemeriksaan kualitas data |
+| Jalankan model | Pilih metode imputasi, model peramalan, jumlah hari ramalan, dan R0 |
+| Hasil | Kelas risiko, interpretasi otomatis, grafik PFVI dengan pita kelas, tabel ramalan, jumlah hari per kelas |
+| Evaluasi model | Akurasi peramalan dibanding tebakan naif, uji Ljung-Box, parameter PFVI hasil kalibrasi |
+| Unduh | Hasil per hari, evaluasi model, dan temuan kualitas data dalam CSV |
 
 ## Yang ditambahkan aplikasi di luar kode riset
 
@@ -41,7 +32,7 @@ Supaya transparan, berikut bagian yang **bukan** berasal dari kode riset (semuan
 4. **Opsi mengecualikan** titik yang diduga gangguan sensor sebelum imputasi.
 5. **Baseline naif** (nilai terakhir diteruskan) dengan pembagian latih/uji 80/20 yang sama dengan kode riset, sebagai pembanding akurasi.
 6. **Ringkasan operasional**: jumlah hari per kelas, rangkaian hari Ekstrem berturut-turut, dan jumlah hari faktor hujan aktif (> 5,1 mm).
-7. **Ringkasan untuk pengambil keputusan**: lima butir dalam bahasa biasa (status risiko, lama kondisi Ekstrem, kualitas data, keandalan ramalan, batasan), ditulis otomatis dari hasil setiap run.
+7. **Interpretasi otomatis**: lima butir dalam bahasa biasa (status risiko, lama kondisi Ekstrem, kualitas data, keandalan ramalan, batasan), ditulis otomatis dari hasil setiap run.
 
 Kalibrasi PFVI tetap mengikuti kode riset: parameter dioptimasi ulang setiap kali dijalankan, memakai data observasi ditambah data ramalan.
 
@@ -78,7 +69,7 @@ Buka folder `peatfr-app` di VS Code, buat terminal R (Ctrl+Shift+P, **R: Create 
 shiny::runApp()
 ```
 
-Aplikasi terbuka di browser. Coba tombol **"Atau pakai data contoh"**, atau unggah dataset Sabangau dari paper (bit.ly/DatasetSabangau, file CSV dari Google Sheets bisa langsung diunggah).
+Aplikasi terbuka di browser. Di tab Data, klik **"Pakai data Sabangau (paper)"** atau **"Atau pakai data contoh sintetis"**, atau unggah dataset Sabangau dari paper (bit.ly/DatasetSabangau, file CSV dari Google Sheets bisa langsung diunggah).
 
 Tahap kalibrasi PFVI butuh 30 detik sampai beberapa menit, tergantung data.
 
@@ -143,7 +134,7 @@ Disarankan minimal 50 hari data.
 
 ---
 
-## Memperbarui halaman presentasi
+## Memperbarui tab Pemantauan
 
 **Hasil Sabangau** disimpan di `presentasi/hasil_sabangau.rds`. Untuk menghitung ulang (misalnya setelah kode berubah), dari folder aplikasi:
 
@@ -188,18 +179,19 @@ peatfr-app/
 ├── R/
 │   ├── pipeline.R     Pembacaan data, pemeriksaan kualitas, pemanggilan kode riset, ringkasan otomatis
 │   └── grafik.R       Grafik ggplot2
-├── R/presentasi.R     Halaman presentasi: hasil tersimpan, titik panas, grafik skenario, peta
+├── R/presentasi.R     Tab Pemantauan: hasil tersimpan, titik panas, peta
 ├── peatfr-riset/      Salinan kode riset Peatfr untuk server (tanpa LSTM/GRU), lihat SUMBER.md
 ├── presentasi/        Skrip dan hasil Sabangau yang sudah dihitung
 ├── data/
 │   ├── Dataset_Sabangau.csv     Dataset paper (tautan resmi di bagian Data availability paper)
 │   └── firms/                   CSV titik panas NASA FIRMS
-├── www/               Ilustrasi dan pustaka peta Leaflet 1.9.4 (lisensi BSD-2, lihat www/leaflet/LICENSE)
+├── www/               Pustaka peta Leaflet 1.9.4 (lisensi BSD-2, lihat www/leaflet/LICENSE)
 └── contoh/
     └── contoh_data_gambut.csv   Data sintetis 100 hari (bukan data lapangan)
 
-Saat dijalankan, aplikasi memakai `../peatfr` (folder clone lengkap) kalau ada, dan baru memakai `peatfr-riset/` kalau tidak ada. Panel kiri tab Data menampilkan sumber yang sedang dipakai.
 ```
+
+Saat dijalankan, aplikasi memakai `../peatfr` (folder clone lengkap) kalau ada, dan baru memakai `peatfr-riset/` kalau tidak ada. Panel kiri tab Data menampilkan sumber yang sedang dipakai.
 
 ## Keterbatasan prototipe
 

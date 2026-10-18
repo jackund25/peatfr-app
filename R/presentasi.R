@@ -151,7 +151,7 @@ peta_ui <- function(id, hasil, titik, radius = 25, awal_ramalan = NULL) {
 })();",
     id, STASIUN$lat, STASIUN$lon, STASIUN$lat, STASIUN$lon, radius, radius, pts,
     STASIUN$lat, STASIUN$lon, jsonlite_kutip(popup_stasiun))
-  tagList(div(id = id, style = "height: 520px; border-radius: 8px;"), tags$script(HTML(js)))
+  tagList(div(id = id, style = "height: 600px; border-radius: 8px;"), tags$script(HTML(js)))
 }
 
 #' Teks HTML aman untuk disisipkan sebagai string JavaScript.
