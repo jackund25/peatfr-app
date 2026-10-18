@@ -250,7 +250,19 @@ rangkaian_akhir <- function(kelas, target = "Ekstrem") {
   if (r$values[k] == target) r$lengths[k] else 0L
 }
 
-teks_waktu <- function(w) if (inherits(w, "Date")) format(w, "%d %b %Y") else paste("hari ke-", w, sep = "")
+BULAN_ID <- c("Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli",
+              "Agustus", "September", "Oktober", "November", "Desember")
+BULAN_ID_SINGKAT <- c("Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des")
+
+#' Format tanggal berbahasa Indonesia, tidak bergantung pada pengaturan bahasa server.
+tgl_id <- function(x, singkat = FALSE, tahun = TRUE) {
+  x <- as.Date(x)
+  b <- as.integer(format(x, "%m"))
+  nama <- if (singkat) BULAN_ID_SINGKAT[b] else BULAN_ID[b]
+  paste0(as.integer(format(x, "%d")), " ", nama, if (tahun) paste0(" ", format(x, "%Y")) else "")
+}
+
+teks_waktu <- function(w) if (inherits(w, "Date")) tgl_id(w) else paste("hari ke-", w, sep = "")
 angka_id <- function(x, d = 0) format(round(x, d), nsmall = d, decimal.mark = ",", big.mark = ".")
 
 #' Ringkasan otomatis dalam bahasa biasa untuk pengambil keputusan.
@@ -291,7 +303,7 @@ ringkasan_temuan <- function(r, kualitas) {
   isi_kualitas <- sprintf("%d nilai kosong diisi otomatis.", n_kosong)
   if (n_sensor) isi_kualitas <- paste(isi_kualitas, sprintf(
     "%d titik kelembapan tanah diduga gangguan sensor (%s). Kalibrasi PFVI memakai kelembapan sebagai acuan, jadi titik ini ikut memengaruhi indeks.",
-    n_sensor, if (length(r$catatan)) "sudah dikecualikan pada run ini" else "belum dikecualikan; bisa dicoba lewat opsi di tab 2"))
+    n_sensor, if (length(r$catatan)) "sudah dikecualikan pada hasil ini" else "belum dikecualikan pada hasil ini"))
   if (r$hari_hujan_aktif == 0) isi_kualitas <- paste(isi_kualitas,
     "Tidak ada hari dengan hujan di atas 5,1 mm, sehingga faktor hujan di rumus PFVI tidak pernah aktif; satuan data hujan perlu dipastikan.")
   tambah("Kualitas data", isi_kualitas, if (n_sensor || r$hari_hujan_aktif == 0) "perhatian" else "baik")

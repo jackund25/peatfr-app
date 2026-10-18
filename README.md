@@ -13,6 +13,16 @@ Status: **prototipe** untuk eksplorasi internal VeloCT.
 
 ## Alur aplikasi
 
+**Halaman presentasi** (langsung tampil, tanpa menjalankan model):
+
+| Halaman | Isi |
+| --- | --- |
+| Ringkasan | Hasil Sabangau yang sudah dihitung: kelas risiko, tiga pesan utama, ringkasan otomatis, grafik dua skenario (data asli dan tanpa data sensor yang diduga rusak), ilustrasi cara kerja |
+| Peta | Lokasi stasiun Sabangau dan titik panas satelit NASA FIRMS di sekitarnya |
+| Data lintas K/L | Pemetaan pemegang data input model dan usulan peran VeloCT |
+
+**Menu "Coba sendiri"** untuk menjalankan model dengan data apa pun:
+
 | Tab | Isi |
 | --- | --- |
 | 1. Data | Unggah CSV, pemetaan kolom otomatis, grafik empat variabel, pemeriksaan kualitas data |
@@ -133,6 +143,35 @@ Disarankan minimal 50 hari data.
 
 ---
 
+## Memperbarui halaman presentasi
+
+**Hasil Sabangau** disimpan di `presentasi/hasil_sabangau.rds`. Untuk menghitung ulang (misalnya setelah kode berubah), dari folder aplikasi:
+
+```
+Rscript presentasi/hitung_sabangau.R
+```
+
+**Titik panas** dibaca dari semua file CSV di folder `data/firms/`, dalam format keluaran API FIRMS (`/api/area/csv/...`). Tambah atau ganti file di folder itu, lalu muat ulang aplikasi.
+
+Data saat ini: MODIS (`MODIS_SP`) dan VIIRS S-NPP (`VIIRS_SNPP_SP`), 4 s.d. 13 Oktober 2023, kotak 113,6–114,2 BT dan 2,0–2,6 LS. API membatasi 5 hari per permintaan, jadi tiap sensor diunduh dua kali:
+
+```
+https://firms.modaps.eosdis.nasa.gov/api/area/csv/<MAP_KEY>/MODIS_SP/113.6,-2.6,114.2,-2.0/5/2023-10-04
+https://firms.modaps.eosdis.nasa.gov/api/area/csv/<MAP_KEY>/MODIS_SP/113.6,-2.6,114.2,-2.0/5/2023-10-09
+```
+
+(sama untuk `VIIRS_SNPP_SP`). MAP_KEY gratis dari <https://firms.modaps.eosdis.nasa.gov/api/map_key/>; jangan simpan kunci itu di repo.
+
+**Lokasi stasiun** saat ini perkiraan dari peta di paper (Gambar 3). Kalau koordinat resmi sudah didapat, ganti nilai `STASIUN` di `R/presentasi.R`.
+
+Setiap kali ada file yang ditambah atau diubah, perbarui `manifest.json` sebelum diunggah ke GitHub:
+
+```r
+rsconnect::writeManifest(appDir = getwd(), appPrimaryDoc = "app.R")
+```
+
+---
+
 ## LSTM dan GRU
 
 Pilihan LSTM dan GRU hanya muncul kalau TensorFlow (Python) sudah terpasang dan bisa diakses dari R lewat paket `keras3` dan `reticulate`. Aplikasi sengaja tidak memasangnya otomatis karena ukurannya besar. Kode riset sendiri akan mencoba memasangnya saat fungsi LSTM/GRU pertama kali dipanggil.
@@ -149,7 +188,13 @@ peatfr-app/
 ├── R/
 │   ├── pipeline.R     Pembacaan data, pemeriksaan kualitas, pemanggilan kode riset, ringkasan otomatis
 │   └── grafik.R       Grafik ggplot2
+├── R/presentasi.R     Halaman presentasi: hasil tersimpan, titik panas, grafik skenario, peta
 ├── peatfr-riset/      Salinan kode riset Peatfr untuk server (tanpa LSTM/GRU), lihat SUMBER.md
+├── presentasi/        Skrip dan hasil Sabangau yang sudah dihitung
+├── data/
+│   ├── Dataset_Sabangau.csv     Dataset paper (tautan resmi di bagian Data availability paper)
+│   └── firms/                   CSV titik panas NASA FIRMS
+├── www/               Ilustrasi dan pustaka peta Leaflet 1.9.4 (lisensi BSD-2, lihat www/leaflet/LICENSE)
 └── contoh/
     └── contoh_data_gambut.csv   Data sintetis 100 hari (bukan data lapangan)
 
@@ -159,7 +204,7 @@ Saat dijalankan, aplikasi memakai `../peatfr` (folder clone lengkap) kalau ada, 
 ## Keterbatasan prototipe
 
 - Satu pengguna dalam satu waktu; selama model berjalan, aplikasi menunggu sampai selesai.
-- Satu lokasi per unggahan. Belum ada peta atau perbandingan antarlokasi.
+- Satu lokasi per unggahan. Peta baru untuk studi kasus Sabangau; belum ada perbandingan antarlokasi.
 - Belum ada penyimpanan riwayat hasil (basis data).
 - Pemeriksaan gangguan sensor bersifat penanda, bukan koreksi otomatis.
 
